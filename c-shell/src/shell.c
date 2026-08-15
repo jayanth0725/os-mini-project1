@@ -38,7 +38,18 @@ int main(){
         perror("Failed to get starting directory");
         return 1;
     }
-    display_prompt(shell_home);
+
+    char input_buffer[PATH_LENGTH];
+
+    while(1){
+        display_prompt(shell_home);
+        fflush(stdout);
+
+        if(fgets(input_buffer, sizeof(input_buffer), stdin) == NULL){
+            printf("\n");
+            break;
+        }
+    }
 
     return 0;
 }
