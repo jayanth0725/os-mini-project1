@@ -1,3 +1,4 @@
+#include "../include/parser.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -48,6 +49,18 @@ int main(){
         if(fgets(input_buffer, sizeof(input_buffer), stdin) == NULL){
             printf("\n");
             break;
+        }
+
+        input_buffer[strcspn(input_buffer, "\n")] = '\0';
+
+        Token *tokens = tokenise_input(input_buffer);
+
+        if(tokens != NULL){
+            if(validate_grammar(tokens)){
+
+            }
+
+            free_tokens(tokens);
         }
     }
 
