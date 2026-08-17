@@ -62,6 +62,9 @@ int main(){
                     if(strcmp(tokens->value, "hop") == 0){
                         execute_hop(tokens->next, shell_home);
                     }
+                    else if(strcmp(tokens->value, "reveal") == 0){
+                        execute_reveal(tokens->next, shell_home);
+                    }
                     else{
                         printf("cshell: command not found (%s)\n", tokens->value);
                     }
