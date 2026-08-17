@@ -1,4 +1,5 @@
 #include "../include/parser.h"
+#include "../include/builtins.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -57,7 +58,14 @@ int main(){
 
         if(tokens != NULL){
             if(validate_grammar(tokens)){
-
+                if(tokens->type == WORD){
+                    if(strcmp(tokens->value, "hop") == 0){
+                        execute_hop(tokens->next, shell_home);
+                    }
+                    else{
+                        printf("cshell: command not found (%s)\n", tokens->value);
+                    }
+                }
             }
 
             free_tokens(tokens);
