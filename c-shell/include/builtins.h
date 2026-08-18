@@ -20,4 +20,6 @@ void execute_hop(Token *args, const char *shell_home);
 
 void execute_reveal(Token *args, const char *shell_home);
 
+void execute_peek(Token *args);
+
 #endif

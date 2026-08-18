@@ -65,6 +65,9 @@ int main(){
                     else if(strcmp(tokens->value, "reveal") == 0){
                         execute_reveal(tokens->next, shell_home);
                     }
+                    else if(strcmp(tokens->value, "peek") == 0){
+                        execute_peek(tokens->next);
+                    }
                     else{
                         printf("cshell: command not found (%s)\n", tokens->value);
                     }
