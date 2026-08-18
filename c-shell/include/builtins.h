@@ -22,4 +22,6 @@ void execute_reveal(Token *args, const char *shell_home);
 
 void execute_peek(Token *args);
 
+void execute_locate(Token *args);
+
 #endif

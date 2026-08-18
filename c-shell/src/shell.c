@@ -68,6 +68,9 @@ int main(){
                     else if(strcmp(tokens->value, "peek") == 0){
                         execute_peek(tokens->next);
                     }
+                    else if(strcmp(tokens->value, "locate") == 0){
+                        execute_locate(tokens->next);
+                    }
                     else{
                         printf("cshell: command not found (%s)\n", tokens->value);
                     }
