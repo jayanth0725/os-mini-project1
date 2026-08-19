@@ -1,5 +1,6 @@
 #include "../include/parser.h"
 #include "../include/builtins.h"
+#include "../include/execute.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -72,7 +73,7 @@ int main(){
                         execute_locate(tokens->next);
                     }
                     else{
-                        printf("cshell: command not found (%s)\n", tokens->value);
+                        execute_external(tokens);
                     }
                 }
             }
