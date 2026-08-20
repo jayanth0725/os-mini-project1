@@ -62,14 +62,28 @@ int main(){
             if(validate_grammar(tokens)){
                 if(tokens->type == WORD){
                     int saved_stdin = dup(STDIN_FILENO);
+                    int saved_stdout = dup(STDOUT_FILENO);
 
                     int in_count = 0;
                     char *input_files[128];
+
+                    int out_count = 0;
+                    char *out_files[128];
+                    int out_append[128];
+
                     Token *curr = tokens;
 
                     while(curr != NULL && curr->type != OP_PIPE && curr->type != OP_SEMI && curr->type != OP_AMP){
                         if(curr->type == OP_LT && curr->next != NULL && curr->next->type == WORD){
                             input_files[in_count++] = curr->next->value;
+                        }
+                        else if(curr->type == OP_GT && curr->next != NULL && curr->next->type == WORD){
+                            out_append[out_count] = 0;
+                            out_files[out_count++] = curr->next->value;                            
+                        }
+                        else if(curr->type == OP_GTGT && curr->next != NULL && curr->next->type == WORD){
+                            out_append[out_count] = 1;
+                            out_files[out_count++] = curr->next->value;                            
                         }
                         curr = curr->next;
                     }
@@ -118,6 +132,48 @@ int main(){
                             }
                         }
                     }
+
+                    int out_fds[128];
+                    FILE *out_tmp = NULL;
+                    int out_tmp_fd = -1;
+
+                    if(!exec_failed && out_count > 0){
+                        for(int i = 0; i < out_count; i++){
+                            int flags = O_WRONLY | O_CREAT;
+                            flags |= out_append[i] ? O_APPEND : O_TRUNC;
+
+                            out_fds[i] = open(out_files[i], flags, 0644);
+                            if(out_fds[i] < 0){
+                                printf("cshell: unable to create file for writing\n");
+                                exec_failed = 1;
+
+                                for(int j = 0; j < i; j++){
+                                    close(out_fds[j]);
+                                }
+                                break;
+                            }
+                        }
+
+                        if(!exec_failed){
+                            if(out_count == 1){
+                                dup2(out_fds[0], STDOUT_FILENO);
+                            }
+                            else{
+                                out_tmp = tmpfile();
+                                if(!out_tmp){
+                                    perror("tmpfile");
+                                    exec_failed = 1;
+                                    for(int i = 0; i < out_count; i++){
+                                        close(out_fds[i]);
+                                    }
+                                }
+                                else{
+                                    out_tmp_fd = fileno(out_tmp);
+                                    dup2(out_tmp_fd, STDOUT_FILENO);
+                                }
+                            }
+                        }
+                    }
                     
                     if(!exec_failed){
                         if(strcmp(tokens->value, "hop") == 0){
@@ -134,6 +190,28 @@ int main(){
                         }
                         else{
                             execute_external(tokens);
+                        }
+                    }
+
+                    dup2(saved_stdout, STDOUT_FILENO);
+                    close(saved_stdout);
+
+                    if(!exec_failed && out_count > 0){
+                        if(out_count > 1 && out_tmp != NULL){
+                            lseek(out_tmp_fd, 0, SEEK_SET);
+                            char buffer[4096];
+                            ssize_t bytes;
+
+                            while((bytes = read(out_tmp_fd, buffer, sizeof(buffer))) > 0){
+                                for(int i =0; i < out_count; i++){
+                                    write(out_fds[i], buffer, bytes);
+                                }
+                            }
+                            fclose(out_tmp);
+                        }
+
+                        for(int i = 0; i < out_count; i++){
+                            close(out_fds[i]);
                         }
                     }
                     
