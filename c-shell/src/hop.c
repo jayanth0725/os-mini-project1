@@ -174,7 +174,7 @@ void execute_hop(Token *args, const char *shell_home){
     }
 
     Token *current_arg = args;
-    while(current_arg != NULL){
+    while(current_arg != NULL && current_arg->type == WORD){
         char old_dir[PATH_LENGTH];
         getcwd(old_dir, sizeof(old_dir));
 

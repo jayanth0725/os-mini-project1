@@ -33,7 +33,7 @@ void execute_locate(Token *args){
     }
 
     Token *curr = args;
-    while(curr != NULL){
+    while(curr != NULL && curr->type == WORD){
         const char *target = curr->value;
         int found = 0;
 

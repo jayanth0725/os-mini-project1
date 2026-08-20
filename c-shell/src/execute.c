@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 #define PATH_LENGTH 4096
 
@@ -100,6 +101,11 @@ void execute_external(Token *args){
         curr = curr->next;
     }
     argv[argc] = NULL;
+
+    if(argc == 0){
+        free(argv);
+        return;
+    }
 
     char *resolved_path = resolve_command_path(argv[0]);
     if(resolved_path == NULL){

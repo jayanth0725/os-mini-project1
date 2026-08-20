@@ -180,7 +180,7 @@ void execute_peek(Token *args){
 
     Token *curr = args;
 
-    while(curr != NULL){
+    while(curr != NULL && curr->type == WORD){
         int len = (int)strlen(curr->value);
         if(curr->value[0] == '-' && len > 1){
             for(int i = 1; i < len; i++){
@@ -202,12 +202,12 @@ void execute_peek(Token *args){
         curr = curr->next;
     }
 
-    if(curr == NULL){
+    if(curr == NULL || curr->type != WORD){
         peek_file("-", show_lines, reverse);
         return;
     }
 
-    while(curr != NULL){
+    while(curr != NULL && curr->type == WORD){
         peek_file(curr->value, show_lines, reverse);
         curr = curr->next;
     }

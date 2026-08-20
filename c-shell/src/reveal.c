@@ -90,7 +90,7 @@ void execute_reveal(Token *args, const char *shell_home){
     int target_provided = 0;
 
     Token *curr = args;
-    while(curr != NULL){
+    while(curr != NULL && curr->type == WORD){
         int len = (int)strlen(curr->value);
         if(curr->value[0] == '-' && len > 1){
             for(int i = 1; i < len; i++){

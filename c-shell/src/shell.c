@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 
 #define PATH_LENGTH 4096
 #define HOST_LENGTH 255
@@ -60,21 +61,84 @@ int main(){
         if(tokens != NULL){
             if(validate_grammar(tokens)){
                 if(tokens->type == WORD){
-                    if(strcmp(tokens->value, "hop") == 0){
-                        execute_hop(tokens->next, shell_home);
+                    int saved_stdin = dup(STDIN_FILENO);
+
+                    int in_count = 0;
+                    char *input_files[128];
+                    Token *curr = tokens;
+
+                    while(curr != NULL && curr->type != OP_PIPE && curr->type != OP_SEMI && curr->type != OP_AMP){
+                        if(curr->type == OP_LT && curr->next != NULL && curr->next->type == WORD){
+                            input_files[in_count++] = curr->next->value;
+                        }
+                        curr = curr->next;
                     }
-                    else if(strcmp(tokens->value, "reveal") == 0){
-                        execute_reveal(tokens->next, shell_home);
+
+                    int exec_failed = 0;
+                    if(in_count > 0){
+                        if(in_count == 1){
+                            int fd = open(input_files[0], O_RDONLY);
+                            if(fd < 0){
+                                printf("cshell: no such file or directory\n");
+                                exec_failed = 1;
+                            }
+                            else{
+                                dup2(fd, STDIN_FILENO);
+                                close(fd);
+                            }
+                        }
+                        else{
+                            FILE *tmp = tmpfile();
+                            if(!tmp){
+                                perror("tmpfile");
+                                exec_failed = 1;
+                            }
+                            else{
+                                int tmp_fd = fileno(tmp);
+                                char buffer[4096];
+                                for(int i = 0; i < in_count; i++){
+                                    int fd = open(input_files[i], O_RDONLY);
+                                    if(fd < 0){
+                                        printf("cshell: no such file or directory\n");
+                                        exec_failed = 1;
+                                        break;
+                                    }
+                                    ssize_t bytes;
+                                    while((bytes = read(fd, buffer, sizeof(buffer))) > 0){
+                                        write(tmp_fd, buffer, bytes);
+                                    }
+                                    close(fd);
+                                }
+
+                                if(!exec_failed){
+                                    lseek(tmp_fd, 0, SEEK_SET);
+                                    dup2(tmp_fd, STDIN_FILENO);
+                                }
+                                fclose(tmp);
+                            }
+                        }
                     }
-                    else if(strcmp(tokens->value, "peek") == 0){
-                        execute_peek(tokens->next);
+                    
+                    if(!exec_failed){
+                        if(strcmp(tokens->value, "hop") == 0){
+                            execute_hop(tokens->next, shell_home);
+                        }
+                        else if(strcmp(tokens->value, "reveal") == 0){
+                            execute_reveal(tokens->next, shell_home);
+                        }
+                        else if(strcmp(tokens->value, "peek") == 0){
+                            execute_peek(tokens->next);
+                        }
+                        else if(strcmp(tokens->value, "locate") == 0){
+                            execute_locate(tokens->next);
+                        }
+                        else{
+                            execute_external(tokens);
+                        }
                     }
-                    else if(strcmp(tokens->value, "locate") == 0){
-                        execute_locate(tokens->next);
-                    }
-                    else{
-                        execute_external(tokens);
-                    }
+                    
+                    dup2(saved_stdin, STDIN_FILENO);
+                    close(saved_stdin);
                 }
             }
 
