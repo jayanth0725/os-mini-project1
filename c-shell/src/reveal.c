@@ -1,6 +1,5 @@
 #include "../include/builtins.h"
 #include <stdio.h>
-#include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
 #include <dirent.h>
@@ -90,7 +89,19 @@ void execute_reveal(Token *args, const char *shell_home){
     int target_provided = 0;
 
     Token *curr = args;
-    while(curr != NULL && curr->type == WORD){
+    while(curr != NULL && curr->type != OP_PIPE && curr->type != OP_SEMI && curr->type != OP_AMP){
+        if(curr->type == OP_LT || curr->type == OP_GT || curr->type == OP_GTGT){
+            curr = curr->next;
+            if(curr != NULL){
+                curr = curr->next;
+            }
+            continue;
+        }
+
+        if(curr->type != WORD){
+            break;
+        }
+        
         int len = (int)strlen(curr->value);
         if(curr->value[0] == '-' && len > 1){
             for(int i = 1; i < len; i++){

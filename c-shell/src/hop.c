@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 
 #define PATH_LENGTH 4096
 
@@ -174,7 +175,19 @@ void execute_hop(Token *args, const char *shell_home){
     }
 
     Token *current_arg = args;
-    while(current_arg != NULL && current_arg->type == WORD){
+    while(current_arg != NULL && current_arg->type != OP_PIPE && current_arg->type != OP_SEMI && current_arg->type != OP_AMP){
+        if(current_arg->type == OP_LT || current_arg->type == OP_GT || current_arg->type == OP_GTGT){
+            current_arg = current_arg->next;
+            if(current_arg != NULL){
+                current_arg = current_arg->next;
+            }
+            continue;
+        }
+
+        if(current_arg->type != WORD){
+            break;
+        }
+        
         char old_dir[PATH_LENGTH];
         getcwd(old_dir, sizeof(old_dir));
 

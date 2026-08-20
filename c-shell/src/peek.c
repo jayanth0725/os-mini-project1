@@ -3,7 +3,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
-#include <dirent.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
@@ -180,7 +179,19 @@ void execute_peek(Token *args){
 
     Token *curr = args;
 
-    while(curr != NULL && curr->type == WORD){
+    while(curr != NULL && curr->type != OP_PIPE && curr->type != OP_SEMI && curr->type != OP_AMP){
+        if(curr->type == OP_LT || curr->type == OP_GT || curr->type == OP_GTGT){
+            curr = curr->next;
+            if(curr != NULL){
+                curr = curr->next;
+            }
+            continue;
+        }
+
+        if(curr->type != WORD){
+            break;
+        }
+        
         int len = (int)strlen(curr->value);
         if(curr->value[0] == '-' && len > 1){
             for(int i = 1; i < len; i++){
@@ -207,7 +218,19 @@ void execute_peek(Token *args){
         return;
     }
 
-    while(curr != NULL && curr->type == WORD){
+    while(curr != NULL && curr->type != OP_PIPE && curr->type != OP_SEMI && curr->type != OP_AMP){
+        if(curr->type == OP_LT || curr->type == OP_GT || curr->type == OP_GTGT){
+            curr = curr->next;
+            if(curr != NULL){
+                curr = curr->next;
+            }
+            continue;
+        }
+
+        if(curr->type != WORD){
+            break;
+        }
+        
         peek_file(curr->value, show_lines, reverse);
         curr = curr->next;
     }

@@ -3,8 +3,6 @@
 
 #include "parser.h"
 #include <time.h>
-#include <dirent.h>
-#include <sys/stat.h>
 
 #define PATH_LENGTH 4096
 

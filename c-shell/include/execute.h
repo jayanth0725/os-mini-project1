@@ -3,6 +3,6 @@
 
 #include "parser.h"
 
-void execute_external(Token *args);
+void execute_command_group(Token *tokens, const char *shell_home);
 
 #endif

@@ -33,7 +33,19 @@ void execute_locate(Token *args){
     }
 
     Token *curr = args;
-    while(curr != NULL && curr->type == WORD){
+    while(curr != NULL && curr->type != OP_PIPE && curr->type != OP_SEMI && curr->type != OP_AMP){
+        if(curr->type == OP_LT || curr->type == OP_GT || curr->type == OP_GTGT){
+            curr = curr->next;
+            if(curr != NULL){
+                curr = curr->next;
+            }
+            continue;
+        }
+
+        if(curr->type != WORD){
+            break;
+        }
+        
         const char *target = curr->value;
         int found = 0;
 
