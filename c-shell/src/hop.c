@@ -118,7 +118,22 @@ static void record_visit(const char *path, const char *shell_home){
         count++;
     }
 
-    save_frecency_data(entries, count, shell_home);
+    int valid_count = 0;
+    for(int i = 0; i < count;i++){
+        if(access(entries[i].path, F_OK) != 0){
+            continue;
+        }
+
+        double current_score = calculate_frecency(entries[i].rank, entries[i].last_visited);
+        if(current_score < 0.5 && strcmp(entries[i].path, path) != 0){
+            continue;
+        }
+
+        entries[valid_count] = entries[i];
+        valid_count++;
+    }
+
+    save_frecency_data(entries, valid_count, shell_home);
     free(entries);
 }
 
