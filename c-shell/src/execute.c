@@ -284,7 +284,7 @@ void execute_command_group(Token *tokens, const char *shell_home){
                     if(out_count == 1){
                         dup2(out_fds[0], STDOUT_FILENO);
                     }
-                    else{
+                    else if(out_count > 1 && builtin){
                         out_tmp = tmpfile();
                         if(!out_tmp){
                             perror("tmpfile");
@@ -315,7 +315,34 @@ void execute_command_group(Token *tokens, const char *shell_home){
                     execute_locate(cmd_start->next);
                 }
                 else{
-                    execute_external(cmd_start);
+                    if(out_count > 1){
+                        int multi_out_pipe[2];
+                        pipe(multi_out_pipe);
+                        pid_t cmd_pid = fork();
+
+                        if(cmd_pid == 0){
+                            dup2(multi_out_pipe[1], STDOUT_FILENO);
+                            close(multi_out_pipe[0]);
+                            close(multi_out_pipe[1]);
+                            execute_external(cmd_start);    
+                            exit(1);                        
+                        }
+                        else{
+                            close(multi_out_pipe[1]);
+                            char buffer[4096];
+                            ssize_t bytes;
+                            while((bytes = read(multi_out_pipe[0], buffer, sizeof(buffer))) > 0){
+                                for(int i = 0; i < out_count; i++){
+                                    write(out_fds[i], buffer, bytes);
+                                }
+                            }
+                            close(multi_out_pipe[0]);
+                            waitpid(cmd_pid, NULL, 0);  
+                        }
+                    }
+                    else{
+                        execute_external(cmd_start);
+                    }
                 }
             }
 
