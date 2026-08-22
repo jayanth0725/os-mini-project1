@@ -6,8 +6,10 @@
 
 #define PATH_LENGTH 4096
 
+// Allows the previous_dir to be used by reveal.c even though it is defined in hop.c.
 extern char previous_dir[PATH_LENGTH];
 
+// FrecencyEntry struct stores the path of each directory entered for the builtin hop command, the rank of the path, and the last time visited measured in seconds since the UNIX Epoch.
 typedef struct {
     char path[PATH_LENGTH];
     double rank;

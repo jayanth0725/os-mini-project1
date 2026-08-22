@@ -1,6 +1,7 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+// Enum for all the seven defined token types: |, &, ;, <, >, >>, word.
 typedef enum {
     OP_PIPE,
     OP_AMP,
@@ -11,6 +12,7 @@ typedef enum {
     WORD
 } TokenType;
 
+// Token struct that stores the token type, the token value and a link to the next following token as a Linked List.
 typedef struct Token {
     TokenType type;
     char *value;

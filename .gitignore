@@ -1,1 +1,2 @@
+# Ignoring the frecency file because these entries are user-dependent.
 .cshell_frecency
