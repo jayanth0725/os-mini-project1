@@ -64,7 +64,7 @@ static void collect_reveal_entries(const char *base_path, const char *relative_p
         // Sets the is_dir to 1 if the entry has a valid path and is a directory.
         struct stat st;
         int is_dir = 0;
-        if(stat(full_path, &st) == 0) {
+        if(lstat(full_path, &st) == 0) {
             is_dir = S_ISDIR(st.st_mode);
         }
 
