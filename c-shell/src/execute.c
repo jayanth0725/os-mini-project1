@@ -152,7 +152,7 @@ static void execute_external(Token *args){
         }
         printf("cshell: command not found (%s)\n", cmd_name);
         free(argv);
-        return;
+        exit(1);
     }
 
     // The path was resolved successfully, call execv and pass argv to it.
@@ -165,7 +165,9 @@ static void execute_external(Token *args){
 
 // The function that actually executes all the command functions and is exposed in the header file.
 // It also handles all redirection and piping.
-void execute_command_group(Token *tokens, const char *shell_home){
+int execute_command_group(Token *tokens, const char *shell_home){
+    int builtin_failed = 0; // Tracks failures for built-ins running in the parent.
+
     // Iterates through all the tokens to count the number of pipes in the input.
     int pipe_count = 0;
     Token *scan = tokens;
@@ -428,6 +430,11 @@ void execute_command_group(Token *tokens, const char *shell_home){
                 }
             }
 
+            // If this is the parent process, save the failure state.
+            if(num_cmds == 1 && builtin){
+                builtin_failed = exec_failed;
+            }
+
             // If a child process (external command or pipeline component) is running, exit so the shell is not duplicated.
             if(num_cmds > 1 || !builtin){
                 exit(exec_failed ? 1 : 0);
@@ -471,9 +478,18 @@ void execute_command_group(Token *tokens, const char *shell_home){
         }
     }
 
+    // 1 for success, 0 for failure.
+    int group_success = 1;
+
     // Wait for all child processes in the pipeline to finish executing before returning to the prompt.
     for(int i = 0; i < num_cmds; i++){
-        waitpid(pids[i], NULL, 0);
+        int status;
+        waitpid(pids[i], &status, 0);   // Catch the status of the child process.
+
+        // If the process exited normally but with a non-zero status (like exit(1)).
+        if(WIFEXITED(status) && WEXITSTATUS(status) != 0){
+            group_success = 0;
+        }
     }
 
     // Restore the shell's original standard input and output file descriptors globally.
@@ -483,4 +499,7 @@ void execute_command_group(Token *tokens, const char *shell_home){
     // Close the saved backups since they are no longer needed.
     close(saved_stdout);
     close(saved_stdin);
+
+    // If redirection failed earlier (builtin_failed == exec_failed == 1), also count as a failure.
+    return (builtin_failed) ? 0 : group_success;
 }

@@ -75,10 +75,29 @@ int main(){
         if(tokens != NULL){
             // Checks if the input is syntactically correct.
             if(validate_grammar(tokens)){
-                // If the first token is a WORD, route it to execute_command_group() to run built-ins, external commands, or handle errors.
-                if(tokens->type == WORD){
-                    execute_command_group(tokens, shell_home);
+                Token *curr_group = tokens;
+
+                while(curr_group != NULL){
+                    // Execute the current group.
+                    if(curr_group->type == WORD){
+                        int success = execute_command_group(curr_group, shell_home);
+                        if(!success){
+                            break;  // Command failed, stop executing the sequence.
+                        }
+                    }
+
+                    // Advance curr_group to find the operator that ended this command.
+                    while(curr_group != NULL && curr_group->type != OP_SEMI && curr_group->type != OP_AMP){
+                        curr_group = curr_group->next;
+                    }
+
+                    // Move past the operator to the start of the next command group.
+                    if(curr_group != NULL){
+                        // TokenType op = curr_group->type;
+                        curr_group = curr_group->next;
+                    }
                 }
+                
             }
             // Free the tokens of this input to avoid memory leaks.
             free_tokens(tokens);
