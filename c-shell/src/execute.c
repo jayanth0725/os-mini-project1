@@ -397,7 +397,15 @@ int execute_command_group(Token *tokens, const char *shell_home){
                                 }
                             }
                             close(multi_out_pipe[0]);
-                            waitpid(cmd_pid, NULL, 0);  // Wait for the executed command to finish.
+
+                            int status;
+                            waitpid(cmd_pid, &status, 0);  // Wait for the executed command to finish and catch the status.
+
+                            // Propagate the exit status to the main shell for sequential execution.
+                            if(WIFEXITED(status)){
+                                exit(WEXITSTATUS(status));
+                            }
+                            exit(1);
                         }
                     }
                     else{
