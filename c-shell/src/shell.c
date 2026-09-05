@@ -1,10 +1,12 @@
 #include "../include/parser.h"
 #include "../include/builtins.h"
 #include "../include/execute.h"
+#include "../include/jobs.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 
 #define PATH_LENGTH 4096                // POSIX compliant path length.
 #define HOST_LENGTH 255                 // POSIX compliant host name length.
@@ -54,8 +56,24 @@ int main(){
 
     char input_buffer[PATH_LENGTH];
 
+    // Ignore interactive and job-control signals in the shell.
+    signal(SIGINT, SIG_IGN);
+    signal(SIGTSTP, SIG_IGN);
+    signal(SIGTTOU, SIG_IGN);
+
+    // Put the shell in its own process group.
+    setpgid(getpid(), getpid());
+    tcsetpgrp(STDIN_FILENO, getpid());
+
+    // Initialise the background jobs array and start the SIGCHLD handler.
+    init_jobs();
+    setup_sigchild_handler();
+
     // Infinite loop to continuously accept input from the user.
     while(1){
+        foreground_running = 0; // Shell is waiting for user input, safe to print
+        check_background_jobs(); //Catch the deferred completion prints
+
         display_prompt(shell_home);
         fflush(stdout);         // Flushes the input buffer to ensure the shell prompt is always printed.
 
@@ -78,24 +96,36 @@ int main(){
                 Token *curr_group = tokens;
 
                 while(curr_group != NULL){
+                    // Look ahead to see if this command end with an ampersand.
+                    int is_bg = 0;
+                    Token *temp = curr_group;
+                    while(temp != NULL && temp->type != OP_SEMI && temp->type != OP_AMP){
+                        temp = temp->next;
+                    }
+                    if(temp != NULL && temp->type == OP_AMP){
+                        is_bg = 1;
+                    }
+                    
                     // Execute the current group.
                     if(curr_group->type == WORD){
-                        int success = execute_command_group(curr_group, shell_home);
-                        if(!success){
-                            break;  // Command failed, stop executing the sequence.
+                        if(!is_bg){
+                            foreground_running = 1; // Block immediate printing.
+                        }
+
+                        int success = execute_command_group(curr_group, shell_home, is_bg);
+                        
+                        if(!is_bg){
+                            foreground_running = 0; // Unblock printing.
+                            check_background_jobs(); // Print anything that finished while foreground was running.
+                        }
+
+                        if(!success && !is_bg){
+                            break;  // Foreground command failed, stop executing the sequence.
                         }
                     }
 
-                    // Advance curr_group to find the operator that ended this command.
-                    while(curr_group != NULL && curr_group->type != OP_SEMI && curr_group->type != OP_AMP){
-                        curr_group = curr_group->next;
-                    }
-
-                    // Move past the operator to the start of the next command group.
-                    if(curr_group != NULL){
-                        // TokenType op = curr_group->type;
-                        curr_group = curr_group->next;
-                    }
+                    // Move to the next command group.
+                    curr_group = temp ? temp->next : NULL;
                 }
                 
             }

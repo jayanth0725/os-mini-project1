@@ -1,5 +1,6 @@
 #include "../include/execute.h"
 #include "../include/builtins.h"
+#include "../include/jobs.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -7,6 +8,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <signal.h>
 
 #define PATH_LENGTH 4096
 
@@ -165,7 +167,7 @@ static void execute_external(Token *args){
 
 // The function that actually executes all the command functions and is exposed in the header file.
 // It also handles all redirection and piping.
-int execute_command_group(Token *tokens, const char *shell_home){
+int execute_command_group(Token *tokens, const char *shell_home, int is_background){
     int builtin_failed = 0; // Tracks failures for built-ins running in the parent.
 
     // Iterates through all the tokens to count the number of pipes in the input.
@@ -189,6 +191,14 @@ int execute_command_group(Token *tokens, const char *shell_home){
     // These will be restored at the end of the pipeline so the shell can read/print normally again.
     int saved_stdin = dup(STDIN_FILENO);
     int saved_stdout = dup(STDOUT_FILENO);
+
+    // Block SIGCHLD if this is a background process to prevent race conditions.
+    sigset_t mask, prev_mask;
+    if(is_background){
+        sigemptyset(&mask);
+        sigaddset(&mask, SIGCHLD);
+        sigprocmask(SIG_BLOCK, &mask, &prev_mask);
+    }
 
     // Iterate through all the commands in the input.
     for(int i = 0; i < num_cmds; i++){
@@ -229,13 +239,38 @@ int execute_command_group(Token *tokens, const char *shell_home){
         int builtin = is_builtin(cmd_start);
         pid_t pid = 0;
 
-        // If it is not a builtin, or if it's part of a pipeline, create a child process with fork().
-        if(num_cmds > 1 || !builtin){
+        // If it is not a builtin, or if it is part of a pipeline, or if it is a background command (can be a builtin also), create a child process with fork().
+        int needs_fork = (num_cmds > 1 || !builtin || is_background);
+
+        if(needs_fork){
             pid = fork();
         }
 
+        // Set the child's process group immediately in the parent to avoid race conditions.
+        // All commands in a pipeline share the PID of the first command as their PGID.
+        if(needs_fork && pid != 0){
+            pid_t pgid = (i == 0) ? pid : pids[0];
+            setpgid(pid, pgid);
+        }
+
         // Executes this block if it is the child process or there is only one builtin function (runs in parent).
-        if(pid == 0 || (num_cmds == 1 && builtin)){
+        if(pid == 0 || (!needs_fork && builtin)){
+            if(needs_fork && pid == 0){
+                // The child must also set its own process group before execv.
+                pid_t pgid = (i == 0) ? getpid() : pids[0];
+                setpgid(getpid(), pgid);
+
+                // Reset signal handlers to default so extternal commands can still be killed via Ctrl + C.
+                signal(SIGINT, SIG_DFL);
+                signal(SIGTSTP, SIG_DFL);
+                signal(SIGTTOU, SIG_DFL);
+
+                // The child process must unblock SIGCHLD so it functions normally.
+                if(is_background){
+                    sigprocmask(SIG_SETMASK, &prev_mask, NULL);
+                }
+            }
+
             int exec_failed = 0;
 
             // For handling pipeline redirection (connecting pipes).
@@ -444,7 +479,7 @@ int execute_command_group(Token *tokens, const char *shell_home){
             }
 
             // If a child process (external command or pipeline component) is running, exit so the shell is not duplicated.
-            if(num_cmds > 1 || !builtin){
+            if(needs_fork){
                 exit(exec_failed ? 1 : 0);
             }
         }
@@ -489,15 +524,34 @@ int execute_command_group(Token *tokens, const char *shell_home){
     // 1 for success, 0 for failure.
     int group_success = 1;
 
-    // Wait for all child processes in the pipeline to finish executing before returning to the prompt.
-    for(int i = 0; i < num_cmds; i++){
-        int status;
-        waitpid(pids[i], &status, 0);   // Catch the status of the child process.
-
-        // If the process exited normally but with a non-zero status (like exit(1)).
-        if(WIFEXITED(status) && WEXITSTATUS(status) != 0){
-            group_success = 0;
+    if(is_background){
+        // Register the job and print its info. Do not wait.
+        // pids[0] is the PID of the first command in the pipeline.
+        int job_id = add_background_job(pids[0], tokens->value);
+        if(job_id != -1){
+            printf("[%d] %d\n", job_id, pids[0]);
         }
+
+        // Safely unblock SIGCHLD now that the job is registered.
+        sigprocmask(SIG_SETMASK, &prev_mask, NULL);
+    }
+    else{
+        // Give terminal control to the foreground pipeline.
+        tcsetpgrp(STDIN_FILENO, pids[0]);
+
+        // Wait for all child processes in the pipeline to finish executing before returning to the prompt.
+        for(int i = 0; i < num_cmds; i++){
+            int status;
+            waitpid(pids[i], &status, WUNTRACED);   // Catch the status of the child process.
+
+            // If the process exited normally but with a non-zero status (like exit(1)).
+            if(WIFEXITED(status) && WEXITSTATUS(status) != 0){
+                group_success = 0;
+            }
+        }
+
+        // Reclaim terminal control for the shell.
+        tcsetpgrp(STDIN_FILENO, getpid());
     }
 
     // Restore the shell's original standard input and output file descriptors globally.

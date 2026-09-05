@@ -4,6 +4,6 @@
 #include "parser.h"
 
 // Overall execute command that handles builtin commands, external commands, redirection and piping.
-int execute_command_group(Token *tokens, const char *shell_home);
+int execute_command_group(Token *tokens, const char *shell_home, int is_background);
 
 #endif
